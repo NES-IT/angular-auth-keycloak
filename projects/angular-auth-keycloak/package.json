@@ -1,6 +1,30 @@
 {
-  "name": "angular-auth-keycloak",
+  "name": "@nes/angular-auth-keycloak",
   "version": "0.0.1",
+  "description": "Keycloak OIDC Authorization Code Flow authentication for Angular 6 web apps.",
+  "keywords": [
+    "keycloak",
+    "angular",
+    "authentication",
+    "auth",
+    "oidc",
+    "openid",
+    "openid connect",
+    "authorization code flow",
+    "code flow"
+  ],
+  "bugs": {
+    "url": "https://github.com/NES-IT/angular-auth-keycloak/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Nico Luisetto",
+    "email": "n.luisetto@nessrls.it"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NES-IT/angular-auth-keycloak.git"
+  },
   "peerDependencies": {
     "@angular/common": "^6.0.0-rc.0 || ^6.0.0",
     "@angular/core": "^6.0.0-rc.0 || ^6.0.0"
