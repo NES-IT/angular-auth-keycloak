@@ -17,7 +17,7 @@ Add Keycloak Javascript Adapter script to your page, you can source it directly 
 ```
 <script type="text/javascript" src="http://my-keycloak-server-address/auth/js/keycloak.js"></script>
 ```
-Import [AngularAuthKeycloakModule](./projects/angular-auth-keycloak/src/lib/angular-auth-keycloak.module.ts) into the root application module, providing configuration settings.
+Import [AngularAuthKeycloakModule](projects/angular-auth-keycloak/src/lib/angular-auth-keycloak.module.ts) into the root application module, providing configuration settings.
 ```
 @NgModule({
   declarations: [...],
@@ -39,7 +39,7 @@ Import [AngularAuthKeycloakModule](./projects/angular-auth-keycloak/src/lib/angu
 })
 export class AppModule { }
 ```
-Use [AuthenticatedUserGuard](/projects/angular-auth-keycloak/src/lib/authenticated-user.guard.ts) to protect routes you want only authenticated user to access.
+Use [AuthenticatedUserGuard](projects/angular-auth-keycloak/src/lib/authenticated-user.guard.ts) to protect routes you want only authenticated user to access.
 
 Unauthenticated users that navigate to protected routes will be automatically redirected to the Keycloak login page.
 ```
@@ -52,11 +52,11 @@ const routes: Routes = [
 
 ## Development
 ### Library
-The source code is located in [./projects/angular-auth-keycloak/](./projects/angular-auth-keycloak/)
+The source code is located in [./projects/angular-auth-keycloak/](projects/angular-auth-keycloak)
 
-To build it use `ng build angular-auth-keycloak`, it will then be available in [./dist/angular-auth-keycloak/](./dist/angular-auth-keycloak/).
+To build it use `ng build angular-auth-keycloak`, it will then be available in [./dist/angular-auth-keycloak/](dist/angular-auth-keycloak).
 
 ### Sample App
-The source code is located in [./src/app/](./src/app/)
+The source code is located in [./src/app/](src/app)
 
 To run the sample execute `ng serve`, it will then be available at `http://localhost:4200`.

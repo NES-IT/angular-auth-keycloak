@@ -1,11 +1,19 @@
-import { Inject, Injectable, OnDestroy } from '@angular/core';
-import { Configuration, CONFIGURATION_INJECTION_TOKEN } from './config.model';
+import {Inject, Injectable, InjectionToken, OnDestroy} from '@angular/core';
 import {BehaviorSubject, Observable, Subject, Subscription, timer} from 'rxjs';
-import {filter, map, retry, switchMap, tap} from 'rxjs/operators';
-import { fromPromise } from 'rxjs/internal-compatibility';
+import {filter, map, switchMap, tap} from 'rxjs/operators';
+import {fromPromise } from 'rxjs/internal-compatibility';
+import {OidcSettings} from './oidc-settings.model';
+import {UserIdentity} from './user-identity.model';
+import {UnauthorizedUserReaction} from './unauthorized-user.reaction';
+import {st} from '@angular/core/src/render3';
 
 // import (kinda) global variable
 declare var Keycloak: any;
+
+/**
+ * Injection token for @class OidcSettings
+ */
+export const OIDC_SETTINGS = new InjectionToken<UnauthorizedUserReaction>('Configuration for OIDC authentication');
 
 /**
  * KeycloakService wrap an instance of Keycloak js connector
@@ -21,12 +29,17 @@ export class KeycloakService implements OnDestroy {
   private readonly authenticationStateStream: Observable<boolean>;
   private readonly encodedTokenStream: Observable<string>;
   private readonly tokenExpirationStream: Observable<number>;
+  private readonly userIdentityStream: Observable<UserIdentity>;
 
   /**
-   * @param configuration The configuration of the service behavior
+   * @param oidcSettings Settings for OIDC protocol
    */
-  constructor(@Inject(CONFIGURATION_INJECTION_TOKEN) configuration: Configuration) {
-    this.keycloak = Keycloak(configuration.oidcSettings);
+  constructor(@Inject(OIDC_SETTINGS) oidcSettings: OidcSettings) {
+    this.keycloak = Keycloak({
+      url: oidcSettings.url,
+      realm: oidcSettings.realm,
+      clientId: oidcSettings.clientId
+    });
 
     this.subscriptions = [];
     this.internalAuthenticationStateStream = new BehaviorSubject<InternalAuthenticationState>(undefined);
@@ -38,56 +51,70 @@ export class KeycloakService implements OnDestroy {
     this.encodedTokenStream = this.internalAuthenticationStateStream
       .pipe(
         filter((state) => !!state && state.isUserAuthenticated),
-        map((state) => state.encodedToken)
+        map((state) => state.encodedAuthorizationToken)
       );
     this.tokenExpirationStream = this.internalAuthenticationStateStream
       .pipe(
         filter((state) => !!state && state.isUserAuthenticated),
-        map((state) => state.claims.exp)
+        map((state) => state.authorizationTokenClaims.exp)
+      );
+    this.userIdentityStream = this.internalAuthenticationStateStream
+      .pipe(
+        filter((state) => !!state && state.isUserAuthenticated),
+        map((state) => {
+          const sub: string = state.identityTokenClaims.sub;
+          const name: string = state.identityTokenClaims.name;
+          const username: string = state.identityTokenClaims.preferred_username;
+          const email: string = state.identityTokenClaims.email;
+          const roles: string[] = state.authorizationTokenClaims.realm_access.roles;
+
+          return new UserIdentity(sub, name, username, email, roles);
+        })
       );
 
-    const initOptions = this.getInitOptions(configuration);
-    const keycloakInitializationPromise = this.keycloak.init(initOptions);
+    const keycloakInitializationPromise = this.keycloak.init();
+    const observableKeycloakInitializationResult = fromPromise(keycloakInitializationPromise);
 
     this.subscriptions.push(
-      fromPromise(keycloakInitializationPromise)
+      observableKeycloakInitializationResult
         .pipe(
           map(() => ({
             isUserAuthenticated: this.keycloak.authenticated,
-            encodedToken: this.keycloak.token,
-            claims: this.keycloak.tokenParsed
+            encodedAuthorizationToken: this.keycloak.token,
+            authorizationTokenClaims: this.keycloak.tokenParsed,
+            identityTokenClaims: this.keycloak.idTokenParsed
           })),
-          tap((initialState) => console.log('about to set the initial state', { initialState })),
-          tap((initialState) => this.internalAuthenticationStateStream.next(initialState)),
+          tap((initialState: InternalAuthenticationState) => console.log('about to set the initial state', { initialState })),
+          tap((initialState: InternalAuthenticationState) => this.internalAuthenticationStateStream.next(initialState)),
           // the Keycloak object already do this during initialization phase
           // but for some reason the hash reappear some time later,
           // doing it again here is just a workaround
-          tap(() => this.removeEventualFragmentsFromUrl()),
+          tap((initialState: InternalAuthenticationState) => this.removeEventualFragmentsFromUrl())
         )
         .subscribe()
     );
 
-    if (configuration.automaticallyRefreshToken)
-      this.subscriptions.push(
-        this.tokenExpirationStream
-          .pipe(
-            map((tokenExpirationInSeconds) => tokenExpirationInSeconds * 1000),
-            map((tokenExpirationInMilliseconds) => tokenExpirationInMilliseconds - Date.now()),
-            map((millisecondsUntilTokenExpiration) => Math.max(0, millisecondsUntilTokenExpiration - 1000)),
-            tap((millisecondsUntilTokenExpiration) => console.log('token will be refreshed in about ' + millisecondsUntilTokenExpiration + ' milliseconds')),
-            switchMap(timer),
-            tap(() => console.log('about to refresh token')),
-            switchMap(() => this.refreshToken()),
-            map(() => ({
-              isUserAuthenticated: this.keycloak.authenticated,
-              encodedToken: this.keycloak.token,
-              claims: this.keycloak.tokenParsed
-            })),
-            tap((newState) => console.log('about to set the new state', { newState })),
-            tap((newState) => this.internalAuthenticationStateStream.next(newState))
-          )
-          .subscribe()
-      );
+    this.subscriptions.push(
+      this.tokenExpirationStream
+        .pipe(
+          map((tokenExpirationInSeconds) => tokenExpirationInSeconds * 1000),
+          map((tokenExpirationInMilliseconds) => tokenExpirationInMilliseconds - Date.now()),
+          map((millisecondsUntilTokenExpiration) => Math.max(0, millisecondsUntilTokenExpiration - 1000)),
+          tap((millisecondsUntilTokenExpiration) => console.log('token will be refreshed in about ' + millisecondsUntilTokenExpiration + ' milliseconds')),
+          switchMap(timer),
+          tap(() => console.log('about to refresh token')),
+          switchMap(() => this.refreshToken()),
+          map(() => ({
+            isUserAuthenticated: this.keycloak.authenticated,
+            encodedAuthorizationToken: this.keycloak.token,
+            authorizationTokenClaims: this.keycloak.tokenParsed,
+            identityTokenClaims: this.keycloak.idTokenParsed
+          })),
+          tap((newState) => console.log('about to set the new state', { newState })),
+          tap((newState) => this.internalAuthenticationStateStream.next(newState))
+        )
+        .subscribe()
+    );
   }
 
 
@@ -95,36 +122,44 @@ export class KeycloakService implements OnDestroy {
    * Load Keycloak server login page.
    *
    * After the user complete the login, it will be redirected
-   * to returnURL.
+   * to returnUrl.
    *
-   * @param returnURL the URL to be redirected at by Keycloak server
+   * @param returnUrl the URL to be redirected at by Keycloak server
    * after the login.
    */
-  public login(returnURL) {
-    console.log('initiating login', { returnURL });
+  public login(returnUrl?: string) {
+
+    if (!returnUrl)
+      returnUrl = location.href;
+
+    console.log('initiating login', { returnURL: returnUrl });
 
     this
       .keycloak
-      .login({ redirectUri: returnURL });
+      .login({ redirectUri: returnUrl });
   }
 
   /**
    * Load Keycloak server logout page.
    *
    * After the logout procedure has been completed,
-   * if automaticallyAuthenticateUserAtStartup option is enabled
+   * if authenticateUserAtStartup option is enabled
    * Keycloak server will redirect the user to the login page,
-   * otherwise the user will be redirected to returnURL.
+   * otherwise the user will be redirected to returnUrl.
    *
-   * @param returnURL the URL to be redirected at by Keycloak server
+   * @param returnUrl the URL to be redirected at by Keycloak server
    * after the login.
    */
-  public logout(returnURL) {
-    console.log('initiating logout', { returnURL });
+  public logout(returnUrl?: string) {
+
+    if (!returnUrl)
+      returnUrl = location.href;
+
+    console.log('initiating logout', { returnURL: returnUrl });
 
     this
       .keycloak
-      .logout({ redirectUri: returnURL });
+      .logout({ redirectUri: returnUrl });
   }
 
   /**
@@ -136,20 +171,21 @@ export class KeycloakService implements OnDestroy {
   }
 
   /**
+   * @return Observable<UserIdentity>
+   */
+  public getUserIdentity(): Observable<UserIdentity> {
+    return this.userIdentityStream;
+  }
+
+  /**
    * @return Observable<string> encodedToken the bearer authorization token
    * released by Keycloak
    */
-  public getToken(): Observable<string> {
+  public getAccessToken(): Observable<string> {
     return this.encodedTokenStream;
   }
 
 
-
-  private getInitOptions(configuration: Configuration) {
-    return configuration.automaticallyAuthenticateUserAtStartup
-      ? { onLoad: 'login-required' } // automatic redirect to keycloak login page
-      : null;
-  }
 
   private removeEventualFragmentsFromUrl() {
     const currentURL = new URL(window.location.href);
@@ -166,6 +202,8 @@ export class KeycloakService implements OnDestroy {
       .pipe(map((x) => null));
   }
 
+
+
   ngOnDestroy(): void {
 
     for (const subscription of this.subscriptions)
@@ -177,8 +215,9 @@ export class KeycloakService implements OnDestroy {
 
 interface InternalAuthenticationState {
   isUserAuthenticated: boolean;
-  encodedToken: string;
-  claims: Claims;
+  encodedAuthorizationToken: string;
+  authorizationTokenClaims: any;
+  identityTokenClaims: any;
 }
 
 interface Claims {

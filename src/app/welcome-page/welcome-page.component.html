@@ -1,0 +1,20 @@
+<p>
+  welcome-page works!
+</p>
+
+<a routerLink="/public">Public Page</a>
+<br/>
+<a (click)="login()" href="javascript:void(0)">Login</a> to be allowed to reach <a routerLink="/protected">Protected Page</a>
+<br/>
+<a (click)="logout()" href="javascript:void(0)">Logout</a>
+
+<br/>
+<br/>
+
+<h3>access token</h3>
+<pre>{{ getAccessToken() | async | json }}</pre>
+
+<br/>
+
+<h3>user identity</h3>
+<pre>{{ getUserIdentity() | async | json }}</pre>
