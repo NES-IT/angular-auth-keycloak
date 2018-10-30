@@ -35,12 +35,6 @@ const oidcSettings: OidcSettings = {
     PublicPageComponent,
     WelcomePageComponent
   ],
-  providers: [
-    {
-      provide: UNAUTHENTICATED_USER_REDIRECTION_ROUTE,
-      useValue: '/welcome'
-    }
-  ],
   imports: [
     BrowserModule,
     AngularAuthKeycloakModule.forRoot(
@@ -49,6 +43,12 @@ const oidcSettings: OidcSettings = {
     ),
     RouterModule.forRoot(routes),
     RouterTestingModule
+  ],
+  providers: [
+    {
+      provide: UNAUTHENTICATED_USER_REDIRECTION_ROUTE,
+      useValue: '/welcome'
+    }
   ],
   bootstrap: [ AppComponent ]
 })

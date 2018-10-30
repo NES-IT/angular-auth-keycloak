@@ -27,7 +27,9 @@ export class KeycloakService implements OnDestroy {
   private readonly subscriptions: Array<Subscription>;
   private readonly internalAuthenticationStateStream: Subject<InternalAuthenticationState>;
   private readonly authenticationStateStream: Observable<boolean>;
-  private readonly encodedTokenStream: Observable<string>;
+  private readonly encodedAccessTokenStream: Observable<string>;
+  private readonly accessTokenClaimsStream: Observable<object>;
+  private readonly identityTokenClaimsStream: Observable<object>;
   private readonly tokenExpirationStream: Observable<number>;
   private readonly userIdentityStream: Observable<UserIdentity>;
 
@@ -48,10 +50,20 @@ export class KeycloakService implements OnDestroy {
         filter((state) => !!state),
         map((state) => state.isUserAuthenticated)
       );
-    this.encodedTokenStream = this.internalAuthenticationStateStream
+    this.encodedAccessTokenStream = this.internalAuthenticationStateStream
       .pipe(
         filter((state) => !!state && state.isUserAuthenticated),
         map((state) => state.encodedAuthorizationToken)
+      );
+    this.accessTokenClaimsStream = this.internalAuthenticationStateStream
+      .pipe(
+        filter((state) => !!state && state.isUserAuthenticated),
+        map((state) => state.authorizationTokenClaims)
+      );
+    this.identityTokenClaimsStream = this.internalAuthenticationStateStream
+      .pipe(
+        filter((state) => !!state && state.isUserAuthenticated),
+        map((state) => state.identityTokenClaims)
       );
     this.tokenExpirationStream = this.internalAuthenticationStateStream
       .pipe(
@@ -129,14 +141,15 @@ export class KeycloakService implements OnDestroy {
    */
   public login(returnUrl?: string) {
 
-    if (!returnUrl)
-      returnUrl = location.href;
+    const actualReturnUrl: string = !!returnUrl
+      ? returnUrl
+      : location.href;
 
-    console.log('initiating login', { returnURL: returnUrl });
+    console.log('initiating login', { returnURL: actualReturnUrl });
 
     this
       .keycloak
-      .login({ redirectUri: returnUrl });
+      .login({ redirectUri: actualReturnUrl });
   }
 
   /**
@@ -152,14 +165,15 @@ export class KeycloakService implements OnDestroy {
    */
   public logout(returnUrl?: string) {
 
-    if (!returnUrl)
-      returnUrl = location.href;
+    const actualReturnUrl: string = !!returnUrl
+      ? returnUrl
+      : location.href;
 
-    console.log('initiating logout', { returnURL: returnUrl });
+    console.log('initiating logout', { returnURL: actualReturnUrl });
 
     this
       .keycloak
-      .logout({ redirectUri: returnUrl });
+      .logout({ redirectUri: actualReturnUrl });
   }
 
   /**
@@ -178,20 +192,36 @@ export class KeycloakService implements OnDestroy {
   }
 
   /**
-   * @return Observable<string> encodedToken the bearer authorization token
+   * @return Observable<string> accessToken, the encoded bearer authorization token
    * released by Keycloak
    */
   public getAccessToken(): Observable<string> {
-    return this.encodedTokenStream;
+    return this.encodedAccessTokenStream;
+  }
+
+  /**
+   * @return Observable<object> accessTokenClaims, claims contained in the authorization token
+   * released by Keycloak
+   */
+  public getAccessTokenClaims(): Observable<object> {
+    return this.accessTokenClaimsStream;
+  }
+
+  /**
+   * @return Observable<object> identityTokenClaims, claims contained in the identity token
+   * released by Keycloak
+   */
+  public getIdentityTokenClaims(): Observable<object> {
+    return this.accessTokenClaimsStream;
   }
 
 
 
   private removeEventualFragmentsFromUrl() {
-    const currentURL = new URL(window.location.href);
-    const currentURLwithoutFragment = currentURL.origin + currentURL.pathname;
+    const currentUrl = new URL(window.location.href);
+    const currentUrlWithoutFragment = currentUrl.origin + currentUrl.pathname;
 
-    window.history.replaceState({}, null, currentURLwithoutFragment);
+    window.history.replaceState({}, null, currentUrlWithoutFragment);
   }
 
   private refreshToken(): Observable<void> {
