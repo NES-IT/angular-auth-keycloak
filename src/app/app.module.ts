@@ -11,7 +11,7 @@ import { PublicPageComponent } from './public-page/public-page.component';
 import { WelcomePageComponent } from './welcome-page/welcome-page.component';
 import {OidcSettings} from '../../projects/angular-auth-keycloak/src/lib/oidc-settings.model';
 import {
-  NavigateToRoute,
+  NavigateToRouteIfUnauthenticated,
   UNAUTHENTICATED_USER_REDIRECTION_ROUTE
 } from '../../projects/angular-auth-keycloak/src/lib/unauthenticated-user.reaction';
 
@@ -39,7 +39,7 @@ const oidcSettings: OidcSettings = {
     BrowserModule,
     AngularAuthKeycloakModule.forRoot(
       oidcSettings,
-      NavigateToRoute
+      NavigateToRouteIfUnauthenticated
     ),
     RouterModule.forRoot(routes),
     RouterTestingModule

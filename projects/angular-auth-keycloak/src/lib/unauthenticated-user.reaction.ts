@@ -13,7 +13,7 @@ export abstract class UnauthenticatedUserReaction {
 }
 
 @Injectable()
-export class Login extends UnauthenticatedUserReaction {
+export class LoginIfUnauthenticated extends UnauthenticatedUserReaction {
 
   private readonly origin: string;
 
@@ -43,7 +43,7 @@ export class Login extends UnauthenticatedUserReaction {
 export const UNAUTHENTICATED_USER_REDIRECTION_ROUTE = new InjectionToken<string>('route to which redirect unauthorized user');
 
 @Injectable()
-export class NavigateToRoute extends UnauthenticatedUserReaction {
+export class NavigateToRouteIfUnauthenticated extends UnauthenticatedUserReaction {
 
   constructor(keycloakService: KeycloakService, protected router: Router, @Inject(UNAUTHENTICATED_USER_REDIRECTION_ROUTE) protected route: string) {
     super(keycloakService);
