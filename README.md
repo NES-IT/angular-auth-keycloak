@@ -18,34 +18,61 @@ Add Keycloak Javascript Adapter script to your page, you can source it directly 
 <script type="text/javascript" src="http://my-keycloak-server-address/auth/js/keycloak.js"></script>
 ```
 Import [AngularAuthKeycloakModule](projects/angular-auth-keycloak/src/lib/angular-auth-keycloak.module.ts) into the root application module, providing configuration settings.
+
+Using forRoot module method:
+- the first argument define Keycloak context
+- the second argument define the behavior that [AuthenticatedUserGuard](projects/angular-auth-keycloak/src/lib/authenticated-user.guard.ts) must adopt in case the user is not authenticated, there are two built-in implementations:
+  - LoginIfUnauthenticated: redirect to Keycloak login page, it's the default behavior if none is specified
+  - NavigateToRouteIfUnauthenticated: navigate to a route of current Angular application specified through UNAUTHENTICATED_USER_REDIRECTION_ROUTE injection token
+- the third argument is optional, and define the behavior that [AuthorizedUserGuard](projects/angular-auth-keycloak/src/lib/authorized-user.guard.ts) must adopt in case the user account does not meet authorization criteria specified in the route, there is one built-in implementation:
+  - NavigateToRouteIfUnauthorized: navigate to a route of current Angular application specified through UNAUTHORIZED_USER_REDIRECTION_ROUTE injection token
+
+You are free to roll your own behaviors by extending [UnauthenticatedUserReaction](projects/angular-auth-keycloak/src/lib/unauthenticated-user.reaction.ts) and [UnauthorizedUserReaction](projects/angular-auth-keycloak/src/lib/unauthorized-user.reaction.ts) abstract classes.
 ```
+const oidcSettings = {
+  url: 'http://my-keycloak-server-address/auth',
+  realm: 'my-secured-realm',
+  clientId: 'this-relying-client-id'
+};
+
 @NgModule({
   declarations: [...],
   imports: [
     ...
-    AngularAuthKeycloakModule.forRoot({
-      oidcSettings: {
-        url: 'http://my-keycloak-server-address/auth',
-        realm: 'my-secured-realm',
-        clientId: 'this-relying-client-id'
-      },
-      automaticallyAuthenticateUserAtStartup: true,
-      automaticallyRefreshToken: true
-    }),
+    AngularAuthKeycloakModule.forRoot(
+      oidcSettings,
+      LoginIfUnauthenticated,
+      NavigateToRouteIfUnauthorized
+    ),
     ...
   ],
-  providers: [...],
+  providers: [
+    ...
+    {
+      provide: UNAUTHORIZED_USER_REDIRECTION_ROUTE,
+      useValue: '/unauthorized'
+    },
+    ...
+  ],
   bootstrap: [...]
 })
 export class AppModule { }
 ```
-Use [AuthenticatedUserGuard](projects/angular-auth-keycloak/src/lib/authenticated-user.guard.ts) to protect routes you want only authenticated user to access.
 
-Unauthenticated users that navigate to protected routes will be automatically redirected to the Keycloak login page.
+Use [AuthenticatedUserGuard](projects/angular-auth-keycloak/src/lib/authenticated-user.guard.ts) to protect routes you want only authenticated user to access:
 ```
 const routes: Routes = [
   ...
   { path: 'protected-page', component: ProtectedPageComponent, canActivate: [ AuthenticatedUserGuard ] }
+  ...
+];
+```
+
+Use [AuthorizedUserGuard](projects/angular-auth-keycloak/src/lib/authorized-user.guard.ts) to protect routes you want only user with a specific role to access:
+```
+const routes: Routes = [
+  ...
+  { path: 'protected-page', component: ProtectedPageComponent, data: { authorization: [ 'admin' ] }, canActivate: [ AuthorizededUserGuard ] }
   ...
 ];
 ```
