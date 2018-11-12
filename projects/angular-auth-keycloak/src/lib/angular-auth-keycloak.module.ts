@@ -2,9 +2,11 @@ import {ModuleWithProviders, NgModule, Provider, Type} from '@angular/core';
 import {KeycloakService, OIDC_SETTINGS} from './keycloak.service';
 import {OidcSettings} from './oidc-settings.model';
 import {UNAUTHENTICATED_USER_REACTION} from './authenticated-user.guard';
-import {Login, UnauthenticatedUserReaction} from './unauthenticated-user.reaction';
+import {LoginIfUnauthenticated, UnauthenticatedUserReaction} from './unauthenticated-user.reaction';
 import {UnauthorizedUserReaction} from './unauthorized-user.reaction';
 import {UNAUTHORIZED_USER_REACTION} from './authorized-user.guard';
+import {AuthorizationTokenInjectorInterceptor} from './authorization-token-injector.interceptor';
+import {HTTP_INTERCEPTORS} from '@angular/common/http';
 
 @NgModule()
 export class AngularAuthKeycloakModule {
@@ -13,6 +15,7 @@ export class AngularAuthKeycloakModule {
 
     const keycloakServiceProvider: Provider = this.getKeycloakServiceProvider();
     const oidcSettingsProvider: Provider = this.getOidcSettingsProvider(oidcSettings);
+    const authorizationTokenInjectorProvider: Provider = this.getAuthorizationTokenInjectorProvider();
     const unauthenticatedUserReactionProvider: Provider = this.getUnauthenticatedUserReactionProvider(unauthenticatedUserReactionType);
     const unauthorizedUserReactionProvider: Provider = this.getUnauthorizedUserReactionProvider(unauthorizedUserReactionType);
 
@@ -21,6 +24,7 @@ export class AngularAuthKeycloakModule {
       providers: [
         keycloakServiceProvider,
         oidcSettingsProvider,
+        authorizationTokenInjectorProvider,
         unauthenticatedUserReactionProvider,
         unauthorizedUserReactionProvider
       ]
@@ -39,10 +43,18 @@ export class AngularAuthKeycloakModule {
     };
   }
 
+  private static getAuthorizationTokenInjectorProvider(): Provider {
+    return {
+      provide: HTTP_INTERCEPTORS,
+      useClass: AuthorizationTokenInjectorInterceptor,
+      multi: true
+    };
+  }
+
   private static getUnauthenticatedUserReactionProvider(unauthenticatedUserReactionType?: Type<UnauthenticatedUserReaction>): Provider {
     return {
       provide: UNAUTHENTICATED_USER_REACTION,
-      useClass: unauthenticatedUserReactionType || Login
+      useClass: unauthenticatedUserReactionType || LoginIfUnauthenticated
     };
   }
 

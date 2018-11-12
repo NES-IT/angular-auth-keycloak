@@ -2,8 +2,9 @@ import {HttpEvent, HttpHandler, HttpInterceptor, HttpRequest} from '@angular/com
 import {KeycloakService} from './keycloak.service';
 import {combineLatest, Observable, of} from 'rxjs';
 import {map, switchMap, take} from 'rxjs/operators';
-import {ActivatedRouteSnapshot, RouterStateSnapshot} from '@angular/router';
+import {Injectable} from '@angular/core';
 
+@Injectable()
 export class AuthorizationTokenInjectorInterceptor implements HttpInterceptor {
 
   constructor(private keycloakService: KeycloakService) {}
@@ -14,25 +15,32 @@ export class AuthorizationTokenInjectorInterceptor implements HttpInterceptor {
       .isUserAuthenticated()
       .pipe(take(1));
 
+    const accessTokenStream = this.keycloakService
+      .getAccessToken()
+      .pipe(take(1));
+
     return combineLatest(
         of(req),
         of(next),
-        of(this.keycloakService),
-        userAuthenticationStateStream
+        userAuthenticationStateStream,
+        accessTokenStream
       )
       .pipe(
-        map(([request, nextHandler, keycloakService, isAuthenticated]): InterceptionState => {
+        map(([request, nextHandler, isAuthenticated, accessToken]): InterceptionState => {
           return {
-            request: request,
             nextHandler: nextHandler,
-            keycloakService: keycloakService,
-            isAuthenticated: isAuthenticated
+            request: !isAuthenticated
+              ? request
+              : request.clone({
+                setHeaders: {
+                  Authorization: `Bearer ${accessToken}`
+                }
+              })
           };
         }),
-        switchMap(),
-        switchMap((interceptionState: InterceptionState) => {
-          const request = interceptionState.request;
-          const nextHandler = interceptionState.nextHandler;
+        switchMap((state: InterceptionState) => {
+          const nextHandler = state.nextHandler;
+          const request = state.request;
 
           return nextHandler.handle(request);
         })
@@ -42,8 +50,6 @@ export class AuthorizationTokenInjectorInterceptor implements HttpInterceptor {
 }
 
 interface InterceptionState {
-  request: HttpRequest<any>;
   nextHandler: HttpHandler;
-  keycloakService: KeycloakService;
-  isAuthenticated: boolean;
+  request: HttpRequest<any>;
 }
