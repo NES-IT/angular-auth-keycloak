@@ -16,9 +16,7 @@ export const UNAUTHENTICATED_USER_REACTION = new InjectionToken<UnauthenticatedU
  *
  * If the user is not authenticated, the UnauthenticatedUserReaction will be triggered.
  */
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable()
 export class AuthenticatedUserGuard implements CanActivate {
   private readonly origin: string;
 

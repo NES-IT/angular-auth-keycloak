@@ -10,4 +10,4 @@ export * from './lib/authorized-user.guard';
 export * from './lib/oidc-settings.model';
 export * from './lib/keycloak.service';
 export * from './lib/angular-auth-keycloak.module';
-export * from './lib/authorization-token-injector.interceptor';
+export * from './lib/access-token-injector.interceptor';

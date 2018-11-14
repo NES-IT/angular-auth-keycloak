@@ -1,11 +1,11 @@
 import {ModuleWithProviders, NgModule, Provider, Type} from '@angular/core';
 import {KeycloakService, OIDC_SETTINGS} from './keycloak.service';
 import {OidcSettings} from './oidc-settings.model';
-import {UNAUTHENTICATED_USER_REACTION} from './authenticated-user.guard';
+import {AuthenticatedUserGuard, UNAUTHENTICATED_USER_REACTION} from './authenticated-user.guard';
 import {LoginIfUnauthenticated, UnauthenticatedUserReaction} from './unauthenticated-user.reaction';
 import {UnauthorizedUserReaction} from './unauthorized-user.reaction';
-import {UNAUTHORIZED_USER_REACTION} from './authorized-user.guard';
-import {AuthorizationTokenInjectorInterceptor} from './authorization-token-injector.interceptor';
+import {AuthorizedUserGuard, UNAUTHORIZED_USER_REACTION} from './authorized-user.guard';
+import {AccessTokenInjectorInterceptor} from './access-token-injector.interceptor';
 import {HTTP_INTERCEPTORS} from '@angular/common/http';
 
 @NgModule()
@@ -15,8 +15,10 @@ export class AngularAuthKeycloakModule {
 
     const keycloakServiceProvider: Provider = this.getKeycloakServiceProvider();
     const oidcSettingsProvider: Provider = this.getOidcSettingsProvider(oidcSettings);
-    const authorizationTokenInjectorProvider: Provider = this.getAuthorizationTokenInjectorProvider();
+    const accessTokenInjectorProvider: Provider = this.getAccessTokenInjectorProvider();
+    const authenticatedUserGuardProvider: Provider = this.getAuthenticatedUserGuardProvider();
     const unauthenticatedUserReactionProvider: Provider = this.getUnauthenticatedUserReactionProvider(unauthenticatedUserReactionType);
+    const authorizedUserGuardProvider: Provider = this.getAuthorizedUserGuardProvider();
     const unauthorizedUserReactionProvider: Provider = this.getUnauthorizedUserReactionProvider(unauthorizedUserReactionType);
 
     return {
@@ -24,8 +26,10 @@ export class AngularAuthKeycloakModule {
       providers: [
         keycloakServiceProvider,
         oidcSettingsProvider,
-        authorizationTokenInjectorProvider,
+        accessTokenInjectorProvider,
+        authenticatedUserGuardProvider,
         unauthenticatedUserReactionProvider,
+        authorizedUserGuardProvider,
         unauthorizedUserReactionProvider
       ]
     };
@@ -43,12 +47,16 @@ export class AngularAuthKeycloakModule {
     };
   }
 
-  private static getAuthorizationTokenInjectorProvider(): Provider {
+  private static getAccessTokenInjectorProvider(): Provider {
     return {
       provide: HTTP_INTERCEPTORS,
-      useClass: AuthorizationTokenInjectorInterceptor,
+      useClass: AccessTokenInjectorInterceptor,
       multi: true
     };
+  }
+
+  private static getAuthenticatedUserGuardProvider(): Provider {
+    return AuthenticatedUserGuard;
   }
 
   private static getUnauthenticatedUserReactionProvider(unauthenticatedUserReactionType?: Type<UnauthenticatedUserReaction>): Provider {
@@ -56,6 +64,10 @@ export class AngularAuthKeycloakModule {
       provide: UNAUTHENTICATED_USER_REACTION,
       useClass: unauthenticatedUserReactionType || LoginIfUnauthenticated
     };
+  }
+
+  private static getAuthorizedUserGuardProvider(): Provider {
+    return AuthorizedUserGuard;
   }
 
   private static getUnauthorizedUserReactionProvider(unauthorizedUserReactionType?: Type<UnauthorizedUserReaction>): Provider {

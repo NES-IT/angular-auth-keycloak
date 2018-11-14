@@ -1,39 +1,33 @@
 import {HttpEvent, HttpHandler, HttpInterceptor, HttpRequest} from '@angular/common/http';
-import {KeycloakService} from './keycloak.service';
+import {AuthenticationState, KeycloakService} from './keycloak.service';
 import {combineLatest, Observable, of} from 'rxjs';
-import {map, switchMap, take} from 'rxjs/operators';
+import {map, switchMap} from 'rxjs/operators';
 import {Injectable} from '@angular/core';
 
 @Injectable()
-export class AuthorizationTokenInjectorInterceptor implements HttpInterceptor {
+export class AccessTokenInjectorInterceptor implements HttpInterceptor {
+  private readonly _authenticationStateStream: Observable<AuthenticationState>;
 
-  constructor(private keycloakService: KeycloakService) {}
+  constructor(keycloakService: KeycloakService) {
+    this._authenticationStateStream = keycloakService.getAuthenticationState();
+  }
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-
-    const userAuthenticationStateStream = this.keycloakService
-      .isUserAuthenticated()
-      .pipe(take(1));
-
-    const accessTokenStream = this.keycloakService
-      .getAccessToken()
-      .pipe(take(1));
 
     return combineLatest(
         of(req),
         of(next),
-        userAuthenticationStateStream,
-        accessTokenStream
+        this._authenticationStateStream
       )
       .pipe(
-        map(([request, nextHandler, isAuthenticated, accessToken]): InterceptionState => {
+        map(([request, nextHandler, authenticationState]): InterceptionState => {
           return {
             nextHandler: nextHandler,
-            request: !isAuthenticated
+            request: !authenticationState.isUserAuthenticated
               ? request
               : request.clone({
                 setHeaders: {
-                  Authorization: `Bearer ${accessToken}`
+                  Authorization: `Bearer ${authenticationState.accessToken}`
                 }
               })
           };

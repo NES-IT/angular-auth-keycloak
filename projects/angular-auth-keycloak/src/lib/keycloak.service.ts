@@ -5,7 +5,6 @@ import {fromPromise } from 'rxjs/internal-compatibility';
 import {OidcSettings} from './oidc-settings.model';
 import {UserIdentity} from './user-identity.model';
 import {UnauthorizedUserReaction} from './unauthorized-user.reaction';
-import {st} from '@angular/core/src/render3';
 
 // import (kinda) global variable
 declare var Keycloak: any;
@@ -22,55 +21,61 @@ export const OIDC_SETTINGS = new InjectionToken<UnauthorizedUserReaction>('Confi
   providedIn: 'root'
 })
 export class KeycloakService implements OnDestroy {
-  private readonly keycloak;
+  private readonly _keycloak;
 
-  private readonly subscriptions: Array<Subscription>;
-  private readonly internalAuthenticationStateStream: Subject<InternalAuthenticationState>;
-  private readonly authenticationStateStream: Observable<boolean>;
-  private readonly encodedAccessTokenStream: Observable<string>;
-  private readonly accessTokenClaimsStream: Observable<object>;
-  private readonly identityTokenClaimsStream: Observable<object>;
-  private readonly tokenExpirationStream: Observable<number>;
-  private readonly userIdentityStream: Observable<UserIdentity>;
+  private readonly _subscriptions: Array<Subscription>;
+  private readonly _internalAuthenticationStateStream: Subject<InternalAuthenticationState>;
+  private readonly _authenticationStateStream: Observable<AuthenticationState>;
+  private readonly _isUserAuthenticatedStream: Observable<boolean>;
+  private readonly _encodedAccessTokenStream: Observable<string>;
+  private readonly _accessTokenClaimsStream: Observable<object>;
+  private readonly _identityTokenClaimsStream: Observable<object>;
+  private readonly _tokenExpirationStream: Observable<number>;
+  private readonly _userIdentityStream: Observable<UserIdentity>;
 
   /**
    * @param oidcSettings Settings for OIDC protocol
    */
   constructor(@Inject(OIDC_SETTINGS) oidcSettings: OidcSettings) {
-    this.keycloak = Keycloak({
+    this._keycloak = Keycloak({
       url: oidcSettings.url,
       realm: oidcSettings.realm,
       clientId: oidcSettings.clientId
     });
 
-    this.subscriptions = [];
-    this.internalAuthenticationStateStream = new BehaviorSubject<InternalAuthenticationState>(undefined);
-    this.authenticationStateStream = this.internalAuthenticationStateStream
+    this._subscriptions = [];
+    this._internalAuthenticationStateStream = new BehaviorSubject<InternalAuthenticationState>(undefined);
+    this._authenticationStateStream = this._internalAuthenticationStateStream
+      .pipe(
+        filter((state) => !!state),
+        map((state) => ({ isUserAuthenticated: state.isUserAuthenticated, accessToken: state.accessToken }))
+      );
+    this._isUserAuthenticatedStream = this._internalAuthenticationStateStream
       .pipe(
         filter((state) => !!state),
         map((state) => state.isUserAuthenticated)
       );
-    this.encodedAccessTokenStream = this.internalAuthenticationStateStream
+    this._encodedAccessTokenStream = this._internalAuthenticationStateStream
       .pipe(
         filter((state) => !!state && state.isUserAuthenticated),
-        map((state) => state.encodedAuthorizationToken)
+        map((state) => state.accessToken)
       );
-    this.accessTokenClaimsStream = this.internalAuthenticationStateStream
+    this._accessTokenClaimsStream = this._internalAuthenticationStateStream
       .pipe(
         filter((state) => !!state && state.isUserAuthenticated),
-        map((state) => state.authorizationTokenClaims)
+        map((state) => state.accessTokenClaims)
       );
-    this.identityTokenClaimsStream = this.internalAuthenticationStateStream
+    this._identityTokenClaimsStream = this._internalAuthenticationStateStream
       .pipe(
         filter((state) => !!state && state.isUserAuthenticated),
         map((state) => state.identityTokenClaims)
       );
-    this.tokenExpirationStream = this.internalAuthenticationStateStream
+    this._tokenExpirationStream = this._internalAuthenticationStateStream
       .pipe(
         filter((state) => !!state && state.isUserAuthenticated),
-        map((state) => state.authorizationTokenClaims.exp)
+        map((state) => state.accessTokenClaims.exp)
       );
-    this.userIdentityStream = this.internalAuthenticationStateStream
+    this._userIdentityStream = this._internalAuthenticationStateStream
       .pipe(
         filter((state) => !!state && state.isUserAuthenticated),
         map((state) => {
@@ -78,26 +83,26 @@ export class KeycloakService implements OnDestroy {
           const name: string = state.identityTokenClaims.name;
           const username: string = state.identityTokenClaims.preferred_username;
           const email: string = state.identityTokenClaims.email;
-          const roles: string[] = state.authorizationTokenClaims.realm_access.roles;
+          const roles: string[] = state.accessTokenClaims.realm_access.roles;
 
           return new UserIdentity(sub, name, username, email, roles);
         })
       );
 
-    const keycloakInitializationPromise = this.keycloak.init();
+    const keycloakInitializationPromise = this._keycloak.init();
     const observableKeycloakInitializationResult = fromPromise(keycloakInitializationPromise);
 
-    this.subscriptions.push(
+    this._subscriptions.push(
       observableKeycloakInitializationResult
         .pipe(
           map(() => ({
-            isUserAuthenticated: this.keycloak.authenticated,
-            encodedAuthorizationToken: this.keycloak.token,
-            authorizationTokenClaims: this.keycloak.tokenParsed,
-            identityTokenClaims: this.keycloak.idTokenParsed
+            isUserAuthenticated: this._keycloak.authenticated,
+            accessToken: this._keycloak.token,
+            accessTokenClaims: this._keycloak.tokenParsed,
+            identityTokenClaims: this._keycloak.idTokenParsed
           })),
           tap((initialState: InternalAuthenticationState) => console.log('about to set the initial state', { initialState })),
-          tap((initialState: InternalAuthenticationState) => this.internalAuthenticationStateStream.next(initialState)),
+          tap((initialState: InternalAuthenticationState) => this._internalAuthenticationStateStream.next(initialState)),
           // the Keycloak object already do this during initialization phase
           // but for some reason the hash reappear some time later,
           // doing it again here is just a workaround
@@ -106,8 +111,8 @@ export class KeycloakService implements OnDestroy {
         .subscribe()
     );
 
-    this.subscriptions.push(
-      this.tokenExpirationStream
+    this._subscriptions.push(
+      this._tokenExpirationStream
         .pipe(
           map((tokenExpirationInSeconds) => tokenExpirationInSeconds * 1000),
           map((tokenExpirationInMilliseconds) => tokenExpirationInMilliseconds - Date.now()),
@@ -117,13 +122,13 @@ export class KeycloakService implements OnDestroy {
           tap(() => console.log('about to refresh token')),
           switchMap(() => this.refreshToken()),
           map(() => ({
-            isUserAuthenticated: this.keycloak.authenticated,
-            encodedAuthorizationToken: this.keycloak.token,
-            authorizationTokenClaims: this.keycloak.tokenParsed,
-            identityTokenClaims: this.keycloak.idTokenParsed
+            isUserAuthenticated: this._keycloak.authenticated,
+            accessToken: this._keycloak.token,
+            accessTokenClaims: this._keycloak.tokenParsed,
+            identityTokenClaims: this._keycloak.idTokenParsed
           })),
           tap((newState) => console.log('about to set the new state', { newState })),
-          tap((newState) => this.internalAuthenticationStateStream.next(newState))
+          tap((newState) => this._internalAuthenticationStateStream.next(newState))
         )
         .subscribe()
     );
@@ -148,7 +153,7 @@ export class KeycloakService implements OnDestroy {
     console.log('initiating login', { returnURL: actualReturnUrl });
 
     this
-      .keycloak
+      ._keycloak
       .login({ redirectUri: actualReturnUrl });
   }
 
@@ -172,8 +177,12 @@ export class KeycloakService implements OnDestroy {
     console.log('initiating logout', { returnURL: actualReturnUrl });
 
     this
-      .keycloak
+      ._keycloak
       .logout({ redirectUri: actualReturnUrl });
+  }
+
+  public getAuthenticationState(): Observable<AuthenticationState> {
+    return this._authenticationStateStream;
   }
 
   /**
@@ -181,14 +190,14 @@ export class KeycloakService implements OnDestroy {
    * false otherwise
    */
   public isUserAuthenticated(): Observable<boolean> {
-    return this.authenticationStateStream;
+    return this._isUserAuthenticatedStream;
   }
 
   /**
    * @return Observable<UserIdentity>
    */
   public getUserIdentity(): Observable<UserIdentity> {
-    return this.userIdentityStream;
+    return this._userIdentityStream;
   }
 
   /**
@@ -196,7 +205,7 @@ export class KeycloakService implements OnDestroy {
    * released by Keycloak
    */
   public getAccessToken(): Observable<string> {
-    return this.encodedAccessTokenStream;
+    return this._encodedAccessTokenStream;
   }
 
   /**
@@ -204,7 +213,7 @@ export class KeycloakService implements OnDestroy {
    * released by Keycloak
    */
   public getAccessTokenClaims(): Observable<object> {
-    return this.accessTokenClaimsStream;
+    return this._accessTokenClaimsStream;
   }
 
   /**
@@ -212,7 +221,7 @@ export class KeycloakService implements OnDestroy {
    * released by Keycloak
    */
   public getIdentityTokenClaims(): Observable<object> {
-    return this.accessTokenClaimsStream;
+    return this._identityTokenClaimsStream;
   }
 
 
@@ -226,7 +235,7 @@ export class KeycloakService implements OnDestroy {
 
   private refreshToken(): Observable<void> {
 
-    const updateTokenPromise: Promise<boolean> = this.keycloak.updateToken(-1);
+    const updateTokenPromise: Promise<boolean> = this._keycloak.updateToken(-1);
 
     return fromPromise(updateTokenPromise)
       .pipe(map((x) => null));
@@ -236,7 +245,7 @@ export class KeycloakService implements OnDestroy {
 
   ngOnDestroy(): void {
 
-    for (const subscription of this.subscriptions)
+    for (const subscription of this._subscriptions)
       subscription.unsubscribe();
 
   }
@@ -245,13 +254,12 @@ export class KeycloakService implements OnDestroy {
 
 interface InternalAuthenticationState {
   isUserAuthenticated: boolean;
-  encodedAuthorizationToken: string;
-  authorizationTokenClaims: any;
+  accessToken: string;
+  accessTokenClaims: any;
   identityTokenClaims: any;
 }
 
-interface Claims {
-
-  readonly exp: number;
-
+export interface AuthenticationState {
+  readonly isUserAuthenticated: boolean;
+  readonly accessToken: string;
 }
