@@ -1,6 +1,6 @@
 {
   "name": "@nes/angular-auth-keycloak",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "Keycloak OIDC Authorization Code Flow authentication for Angular 6 web apps.",
   "keywords": [
     "keycloak",
