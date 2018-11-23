@@ -12,28 +12,18 @@ import {HTTP_INTERCEPTORS} from '@angular/common/http';
 export class AngularAuthKeycloakModule {
 
   static forRoot(oidcSettings: OidcSettings, unauthenticatedUserReactionType?: Type<UnauthenticatedUserReaction>, unauthorizedUserReactionType?: Type<UnauthorizedUserReaction>): ModuleWithProviders {
-
-    const keycloakServiceProvider: Provider = this.getKeycloakServiceProvider();
-    const oidcSettingsProvider: Provider = this.getOidcSettingsProvider(oidcSettings);
-    const accessTokenInjectorProvider: Provider = this.getAccessTokenInjectorProvider();
-    const authenticatedUserGuardProvider: Provider = this.getAuthenticatedUserGuardProvider();
-    const unauthenticatedUserReactionProvider: Provider = this.getUnauthenticatedUserReactionProvider(unauthenticatedUserReactionType);
-    const authorizedUserGuardProvider: Provider = this.getAuthorizedUserGuardProvider();
-    const unauthorizedUserReactionProvider: Provider = this.getUnauthorizedUserReactionProvider(unauthorizedUserReactionType);
-
     return {
       ngModule: AngularAuthKeycloakModule,
       providers: [
-        keycloakServiceProvider,
-        oidcSettingsProvider,
-        accessTokenInjectorProvider,
-        authenticatedUserGuardProvider,
-        unauthenticatedUserReactionProvider,
-        authorizedUserGuardProvider,
-        unauthorizedUserReactionProvider
+        this.getKeycloakServiceProvider(),
+        this.getOidcSettingsProvider(oidcSettings),
+        this.getAccessTokenInjectorProvider(),
+        this.getAuthenticatedUserGuardProvider(),
+        this.getUnauthenticatedUserReactionProvider(unauthenticatedUserReactionType),
+        this.getAuthorizedUserGuardProvider(),
+        this.getUnauthorizedUserReactionProvider(unauthorizedUserReactionType)
       ]
     };
-
   }
 
   private static getKeycloakServiceProvider(): Provider {
