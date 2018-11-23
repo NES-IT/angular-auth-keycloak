@@ -15,61 +15,33 @@ export class AngularAuthKeycloakModule {
     return {
       ngModule: AngularAuthKeycloakModule,
       providers: [
-        this.getKeycloakServiceProvider(),
-        this.getOidcSettingsProvider(oidcSettings),
-        this.getAccessTokenInjectorProvider(),
-        this.getAuthenticatedUserGuardProvider(),
-        this.getUnauthenticatedUserReactionProvider(unauthenticatedUserReactionType),
-        this.getAuthorizedUserGuardProvider(),
-        this.getUnauthorizedUserReactionProvider(unauthorizedUserReactionType)
+        KeycloakService,
+        {
+          provide: OIDC_SETTINGS,
+          useValue: oidcSettings
+        },
+        {
+          provide: HTTP_INTERCEPTORS,
+          useClass: AccessTokenInjectorInterceptor,
+          multi: true
+        },
+        AuthenticatedUserGuard,
+        {
+          provide: UNAUTHENTICATED_USER_REACTION,
+          useClass: unauthenticatedUserReactionType || LoginIfUnauthenticated
+        },
+        AuthorizedUserGuard,
+        (!!unauthorizedUserReactionType)
+          ? {
+            provide: UNAUTHORIZED_USER_REACTION,
+            useClass: unauthorizedUserReactionType
+          }
+          : {
+            provide: UNAUTHORIZED_USER_REACTION,
+            useValue: null
+          }
       ]
     };
-  }
-
-  private static getKeycloakServiceProvider(): Provider {
-    return KeycloakService;
-  }
-
-  private static getOidcSettingsProvider(oidcSettings: OidcSettings): Provider {
-    return {
-      provide: OIDC_SETTINGS,
-      useValue: oidcSettings
-    };
-  }
-
-  private static getAccessTokenInjectorProvider(): Provider {
-    return {
-      provide: HTTP_INTERCEPTORS,
-      useClass: AccessTokenInjectorInterceptor,
-      multi: true
-    };
-  }
-
-  private static getAuthenticatedUserGuardProvider(): Provider {
-    return AuthenticatedUserGuard;
-  }
-
-  private static getUnauthenticatedUserReactionProvider(unauthenticatedUserReactionType?: Type<UnauthenticatedUserReaction>): Provider {
-    return {
-      provide: UNAUTHENTICATED_USER_REACTION,
-      useClass: unauthenticatedUserReactionType || LoginIfUnauthenticated
-    };
-  }
-
-  private static getAuthorizedUserGuardProvider(): Provider {
-    return AuthorizedUserGuard;
-  }
-
-  private static getUnauthorizedUserReactionProvider(unauthorizedUserReactionType?: Type<UnauthorizedUserReaction>): Provider {
-    return (!!unauthorizedUserReactionType)
-      ? {
-        provide: UNAUTHORIZED_USER_REACTION,
-        useClass: unauthorizedUserReactionType
-      }
-      : {
-        provide: UNAUTHORIZED_USER_REACTION,
-        useValue: null
-      };
   }
 
 }
