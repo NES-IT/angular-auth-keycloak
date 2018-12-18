@@ -89,7 +89,7 @@ export class KeycloakService implements OnDestroy {
         })
       );
 
-    const keycloakInitializationPromise = this._keycloak.init({ promiseType: 'native' });
+    const keycloakInitializationPromise = this._keycloak.init({ promiseType: 'native', adapter: 'default' });
     const observableKeycloakInitializationResult = fromPromise(keycloakInitializationPromise);
 
     this._subscriptions.push(
